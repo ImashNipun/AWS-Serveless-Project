@@ -1,0 +1,89 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  imash-xigenix-assignment
+
+  Sample SAM Template for imash-xigenix-assignment
+
+Globals:
+  Function:
+    Timeout: 3
+    MemorySize: 128
+    Environment:
+      Variables:
+        MESSAGE_TABLE: !Ref MessageTable
+        S3_BUCKET_NAME: !Ref MyS3Bucket
+
+Resources:
+  UtilLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: UtilLayer
+      Description: UtilLayer
+      ContentUri: ./utils
+      CompatibleRuntimes:
+        - python3.9
+      RetentionPolicy: Retain
+
+  MessageTable:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      PrimaryKey:
+        Name: id
+        Type: String
+
+  MyS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: x-assignment-bucket
+      AccessControl: Private
+      Tags:
+        - Key: Name
+          Value: YourBucketName
+
+  CreateMessageFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/message/
+      Handler: CreateMessage.create_message_handler
+      Runtime: python3.9
+      Architectures:
+        - x86_64
+      Events:
+        CreateMessage:
+          Type: Api
+          Properties:
+            Path: /message
+            Method: post
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref MessageTable
+        - S3WritePolicy:
+            BucketName: !Ref MyS3Bucket
+      Layers:
+        - !Ref UtilLayer
+
+  GetSingleMessageFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/message/
+      Handler: GetSingleMessage.get_single_message_handler
+      Runtime: python3.9
+      Architectures:
+        - x86_64
+      Events:
+        HelloWorld:
+          Type: Api
+          Properties:
+            Path: /message/{id}
+            Method: get
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref MessageTable
+      Layers:
+        - !Ref UtilLayer
+
+Outputs:
+  MessageApi:
+    Description: API Gateway endpoint URL for Prod stage for Message functions
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
